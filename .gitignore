@@ -29,5 +29,5 @@ dist-ssr/
 *.sw?
 # Local workspace backups
 backend_backup/
-frontend_git_backup/
-backend_git_backup/
+frontend-git-backup/
+backend-git-backup/
