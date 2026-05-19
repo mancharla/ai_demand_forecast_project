@@ -1,0 +1,33 @@
+﻿# Root ignore file
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.env
+*.env
+.venv/
+venv/
+env/
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+dist/
+dist-ssr/
+.vite/
+.package-lock.json
+# Project/IDE
+.vscode/
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+# Local workspace backups
+backend_backup/
+frontend_git_backup/
+backend_git_backup/
