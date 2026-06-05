@@ -15,8 +15,22 @@ import Reports from "./pages/Reports";
 import Admin from "./pages/Admin";
 import ResetPassword from "./pages/ResetPassword";
 import Phase4 from "./pages/Phase4";
+import ProjectsPage from "./pages/ProjectsPage";
+import ProjectDetailPage from "./pages/ProjectDetailPage";
+import ScenarioPlanningPage from "./pages/ScenarioPlanningPage";
+import ExecutiveDashboard from "./pages/ExecutiveDashboard";
+import AIInsightsPage from "./pages/AIInsightsPage";
 import { Toaster } from "react-hot-toast";
-
+import ExecutiveReportsPage from "./pages/ExecutiveReportsPage";
+import ModelPerformancePage from "./pages/ModelPerformancePage";
+import DatasetVersionsPage from "./pages/DatasetVersionsPage";
+import ForecastCollaborationPage from "./pages/ForecastCollaborationPage";
+import DashboardCustomizationPage from "./pages/DashboardCustomizationPage";
+import ForecastSchedulesPage from "./pages/ForecastSchedulesPage";
+import ActivityTimelinePage from "./pages/ActivityTimelinePage";
+import InteractiveDashboardPage from "./pages/InteractiveDashboardPage";
+import ReportSharingPage from "./pages/ReportSharingPage";
+import BusinessHealthPage from "./pages/BusinessHealthPage";
 function App() {
   const token = localStorage.getItem("token");
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -72,6 +86,7 @@ function App() {
             )
           }
         />
+        
         <Route
           path="/ai-recommendations"
           element={
@@ -80,6 +95,46 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/ai-insights/:projectId"
+          element={<AIInsightsPage />}
+        />   
+         <Route
+          path="/executive-reports/:projectId"
+          element={<ExecutiveReportsPage />}
+        /><Route
+          path="/model-performance/:projectId"
+          element={<ModelPerformancePage />}
+        />
+        <Route
+          path="/dataset-versions/:projectId"
+          element={<DatasetVersionsPage />}
+        />
+        <Route
+          path="/forecast-collaboration/:projectId"
+          element={<ForecastCollaborationPage />}
+        />
+        <Route
+          path="/dashboard-customization/:projectId"
+          element={<DashboardCustomizationPage />}
+        />
+        <Route
+          path="/forecast-schedules/:projectId"
+          element={<ForecastSchedulesPage />}
+        />
+        <Route
+          path="/activity-timeline/:projectId"
+          element={<ActivityTimelinePage />}
+        />
+        <Route
+          path="/interactive-dashboard/:projectId"
+          element={<InteractiveDashboardPage />}
+        />
+        <Route path="/report-sharing" element={<ReportSharingPage />} />
+        <Route
+            path="/business-health/:projectId"
+            element={<BusinessHealthPage />}
+          />
 
         <Route
           path="/register"
@@ -126,6 +181,43 @@ function App() {
           element={
             <ProtectedRoute>
               <Reports />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/executive-dashboard"
+          element={
+            <ProtectedRoute>
+              <ExecutiveDashboard />
+            </ProtectedRoute>
+          }
+        />
+        
+
+        <Route
+          path="/projects"
+          element={
+            <ProtectedRoute>
+              <ProjectsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/projects/:projectId"
+          element={
+            <ProtectedRoute>
+              <ProjectDetailPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/projects/:projectId/scenarios"
+          element={
+            <ProtectedRoute>
+              <ScenarioPlanningPage />
             </ProtectedRoute>
           }
         />

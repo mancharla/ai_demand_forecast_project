@@ -66,42 +66,63 @@ def generate_forecast(
             forecast_days=days,
         )
 
-        product_forecasts = result["product_forecasts"]
+        product_forecasts = result.get("product_forecasts", [])
 
-        # Map model comparison metrics so we can store mae/rmse/mape per forecast
-        metrics_map = {}
-        for mc in result.get("model_comparison", []):
-            metrics_map[mc.get("model_name")] = {
-                "mae": mc.get("mae"),
-                "rmse": mc.get("rmse"),
-                "mape": mc.get("mape"),
-            }
+        model_comparison = result.get("model_comparison", [])
 
-        for item in product_forecasts:
-            model_name = item.get("model_used")
-            model_metrics = metrics_map.get(model_name, {})
+        best_metrics = {}
 
-            forecast = Forecast(
-                model_name=model_name,
-                target_column="Sales",
-                mae=model_metrics.get("mae"),
-                rmse=model_metrics.get("rmse"),
-                mape=model_metrics.get("mape"),
-                forecast_values=json.dumps(item),
-                user_id=current_user.id,
-                dataset_id=dataset.id,
+        if isinstance(model_comparison, list) and model_comparison:
+            best_metrics = model_comparison[0] or {}
+
+        elif isinstance(model_comparison, dict):
+            best_metrics = (
+                model_comparison.get("best_model")
+                or model_comparison
+                or {}
             )
 
-            db.add(forecast)
+        top_product = (
+            result.get("top_demand_product")
+            or result.get("top_product")
+            or (
+                product_forecasts[0].get("product")
+                if product_forecasts
+                else "N/A"
+            )
+        )
+
+        forecast_record = Forecast(
+            model_name=result.get("model_used", "Random Forest"),
+            target_column="Sales",
+            mae=best_metrics.get("mae"),
+            rmse=best_metrics.get("rmse"),
+            mape=best_metrics.get("mape"),
+            accuracy=best_metrics.get("accuracy"),
+            forecast_values=json.dumps(
+                {
+                    "type": "product_forecast_run",
+                    "days": days,
+                    "top_demand_product": top_product,
+                    "products_count": len(product_forecasts),
+                    "product_forecasts": product_forecasts,
+                }
+            ),
+            user_id=current_user.id,
+            dataset_id=dataset.id,
+        )
+
+        db.add(forecast_record)
 
         notification = Notification(
             user_id=current_user.id,
             message="Forecast generation completed successfully",
             type="success",
         )
-        clear_cache()
 
         db.add(notification)
+
+        clear_cache()
 
         log_activity(
             db=db,
@@ -131,9 +152,7 @@ def generate_forecast(
             )
 
             valid_dates = df.dropna(subset=["Date"]).copy()
-            valid_dates["Month"] = valid_dates["Date"].dt.strftime(
-                "%Y-%m"
-            )
+            valid_dates["Month"] = valid_dates["Date"].dt.strftime("%Y-%m")
 
             monthly_sales = (
                 valid_dates.groupby("Month")["Sales"]
@@ -144,29 +163,31 @@ def generate_forecast(
         inventory_recommendations = []
 
         for item in product_forecasts:
-            if item["predicted_sales"] > 10000:
+            predicted_sales = item.get("predicted_sales", 0)
+
+            if predicted_sales > 10000:
                 recommendation = "Increase Inventory"
-            elif item["predicted_sales"] < 3000:
+            elif predicted_sales < 3000:
                 recommendation = "Reduce Inventory"
             else:
                 recommendation = "Maintain Inventory"
 
             inventory_recommendations.append(
                 {
-                    "product": item["product"],
+                    "product": item.get("product", "N/A"),
                     "recommendation": recommendation,
                 }
             )
 
         return {
             "message": "Forecast generated successfully",
-            "top_demand_product": result["top_demand_product"],
-            "model_used": result["model_used"],
+            "top_demand_product": top_product,
+            "model_used": result.get("model_used", "Random Forest"),
             "product_forecasts": product_forecasts,
             "city_wise_sales": city_wise_sales,
             "monthly_sales": monthly_sales,
             "inventory_recommendations": inventory_recommendations,
-            "model_comparison": result["model_comparison"],
+            "model_comparison": model_comparison,
         }
 
     except Exception as e:
@@ -177,6 +198,7 @@ def generate_forecast(
         )
 
         db.add(notification)
+
         send_email_notification(
             to_email=current_user.email,
             subject="Forecast Generation Failed",
@@ -235,7 +257,8 @@ def get_my_forecast_history(
                 "model_name": forecast.model_name,
                 "forecast_days": value.get("days", 30),
                 "top_demand_product": (
-                    value.get("product")
+                    value.get("top_demand_product")
+                    or value.get("product")
                     or value.get("product_name")
                     or value.get("top_product")
                     or "N/A"
@@ -245,6 +268,8 @@ def get_my_forecast_history(
         )
 
     return history
+
+
 @router.get("/metrics/my-metrics")
 def get_my_accuracy_metrics(
     db: Session = Depends(get_db),
@@ -276,7 +301,10 @@ def get_my_accuracy_metrics(
             }
         )
 
-    return metrics@router.post("/retrain/all")
+    return metrics
+
+
+@router.post("/retrain/all")
 def retrain_all_models(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
@@ -315,16 +343,20 @@ def retrain_all_models(
         "message": "Model retraining completed",
         "results": results,
     }
+
+
 @router.get("/compare-models/{dataset_id}")
 def compare_models(
     dataset_id: int,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-
     dataset = (
         db.query(Dataset)
-        .filter(Dataset.id == dataset_id)
+        .filter(
+            Dataset.id == dataset_id,
+            Dataset.user_id == current_user.id,
+        )
         .first()
     )
 
@@ -334,10 +366,13 @@ def compare_models(
             detail="Dataset not found",
         )
 
-    file_path = os.path.join(
-        "uploads",
-        dataset.filename,
-    )
+    file_path = os.path.join("uploads", dataset.filename)
+
+    if not os.path.exists(file_path):
+        raise HTTPException(
+            status_code=404,
+            detail="Dataset file not found",
+        )
 
     if dataset.filename.endswith(".csv"):
         df = pd.read_csv(file_path)

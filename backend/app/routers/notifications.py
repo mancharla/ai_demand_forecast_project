@@ -56,14 +56,17 @@ def mark_notification_read(
     }
 
 
-@router.put("/mark-all/read")
+@router.put("/mark-all-read")
 def mark_all_notifications_read(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
     notifications = (
         db.query(Notification)
-        .filter(Notification.user_id == current_user.id)
+        .filter(
+            Notification.user_id == current_user.id,
+            Notification.is_read == 0,
+        )
         .all()
     )
 
@@ -73,5 +76,6 @@ def mark_all_notifications_read(
     db.commit()
 
     return {
-        "message": "All notifications marked as read"
+        "message": "All notifications marked as read",
+        "updated_count": len(notifications),
     }

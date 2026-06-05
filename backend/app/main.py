@@ -11,6 +11,11 @@ from app.models import (
     UserActivityLog,
     APIActivityLog,
 )
+from app.models_extended import (
+    ForecastProject, ProjectMember, ProjectActivity, ProjectDataset, ProjectForecast,
+    ForecastScenario, ForecastComment, ForecastRevision, DatasetVersion,
+    BusinessKPI, AIInsight, ExecutiveReport, ModelPerformance, DashboardLayout
+)
 
 from app.routers.auth import router as auth_router
 from app.routers.dataset import router as dataset_router
@@ -30,7 +35,11 @@ from app.routers.widgets import router as widgets_router
 from app.routers.real_model_comparison import (
     router as real_model_comparison_router,
 )
+from app.routers.report_sharing import router as report_sharing_router
 from app.routers.confidence import router as confidence_router
+from app.routers.dashboard_interactive import (
+    router as dashboard_interactive_router,
+)
 from app.routers.model_confidence import (
     router as model_confidence_router,
 )
@@ -38,9 +47,25 @@ from app.services.scheduler_service import (
     start_scheduler,
     stop_scheduler,
 )
+from app.routers.ai_insights import router as ai_insights_router
 from app.routers.scheduler_status import router as scheduler_status_router
 from app.routers.comparison_reports import router as comparison_reports_router
 from app.routers.drilldown_analytics import router as drilldown_router
+from app.routers.workspaces import router as workspaces_router
+from app.routers.scenarios import router as scenarios_router
+from app.routers.executive_dashboard import router as executive_dashboard_router
+from app.routers.executive_reports import router as executive_reports_router
+from app.routers.model_performance import (
+    router as model_performance_router
+)
+from app.routers.dataset_versions import router as dataset_versions_router
+from app.routers.forecast_collaboration import router as forecast_collaboration_router
+from app.routers.dashboard_customization import router as dashboard_customization_router
+from app.routers.alert_settings import router as alert_settings_router
+from app.routers.forecast_schedules import router as forecast_schedules_router
+from app.services.scheduler_service import start_scheduler, stop_scheduler
+from app.routers.activity_timeline import router as activity_timeline_router
+from app.routers.business_health import router as business_health_router
 import time
 from jose import jwt, JWTError
 from app.config import SECRET_KEY, ALGORITHM
@@ -59,6 +84,14 @@ app = FastAPI(
     title="AI Demand Forecasting API",
     version="1.0.0",
 )
+@app.on_event("startup")
+def startup_event():
+    start_scheduler()
+
+
+@app.on_event("shutdown")
+def shutdown_event():
+    stop_scheduler()
 from app.limiter import limiter
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
@@ -147,6 +180,25 @@ app.include_router(model_confidence_router)
 app.include_router(scheduler_status_router)
 app.include_router(comparison_reports_router)
 app.include_router(drilldown_router)
+app.include_router(workspaces_router)
+app.include_router(scenarios_router)
+app.include_router(executive_dashboard_router)
+app.include_router(ai_insights_router)
+app.include_router(executive_reports_router)
+app.include_router(
+    model_performance_router
+)
+app.include_router(dataset_versions_router)
+app.include_router(forecast_collaboration_router)
+app.include_router(dashboard_customization_router)
+app.include_router(alert_settings_router)
+app.include_router(forecast_schedules_router)
+app.include_router(activity_timeline_router)
+app.include_router(report_sharing_router)
+app.include_router(business_health_router)
+app.include_router(
+    dashboard_interactive_router
+)
 @app.get("/")
 def root():
     return {

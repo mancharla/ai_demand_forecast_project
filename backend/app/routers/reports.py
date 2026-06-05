@@ -7,6 +7,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill
+from openpyxl.chart import PieChart, Reference
+
 from app.database import get_db
 from app.models import Forecast, Notification, Dataset
 from app.utils.dependencies import get_current_user
@@ -15,9 +19,6 @@ from app.services.business_insights import generate_business_insights
 from app.services.seasonal_trends import detect_seasonal_trends
 from app.services.anomaly_detection import detect_sales_anomalies
 from app.services.model_comparison import compare_forecasting_models
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill
-from openpyxl.chart import PieChart, Reference
 from app.services.email_service import send_email_notification
 
 from app.services.professional_reports import (
@@ -27,10 +28,66 @@ from app.services.professional_reports import (
     create_dashboard_pdf_report,
 )
 
+
 router = APIRouter(
     prefix="/reports",
     tags=["Reports"],
 )
+
+
+def extract_forecast_items(forecast):
+    try:
+        value = json.loads(forecast.forecast_values or "{}")
+    except Exception:
+        value = {}
+
+    if value.get("type") == "model_comparison_metric":
+        return []
+
+    product_forecasts = value.get("product_forecasts", [])
+
+    if product_forecasts:
+        items = []
+
+        for item in product_forecasts:
+            items.append(
+                {
+                    "product": item.get("product", "N/A"),
+                    "predicted_sales": float(
+                        item.get("predicted_sales", 0) or 0
+                    ),
+                    "model": item.get("model_used", forecast.model_name),
+                    "dataset_id": forecast.dataset_id,
+                    "created_at": forecast.created_at,
+                }
+            )
+
+        return items
+
+    product = (
+        value.get("product")
+        or value.get("product_name")
+        or value.get("top_product")
+        or value.get("top_demand_product")
+        or "N/A"
+    )
+
+    predicted_sales = (
+        value.get("predicted_sales")
+        or value.get("sales")
+        or value.get("forecast")
+        or 0
+    )
+
+    return [
+        {
+            "product": product,
+            "predicted_sales": float(predicted_sales or 0),
+            "model": forecast.model_name,
+            "dataset_id": forecast.dataset_id,
+            "created_at": forecast.created_at,
+        }
+    ]
 
 
 @router.get("/preview")
@@ -40,7 +97,10 @@ def report_preview(
 ):
     forecasts = (
         db.query(Forecast)
-        .filter(Forecast.user_id == current_user.id)
+        .filter(
+            Forecast.user_id == current_user.id,
+            ~Forecast.forecast_values.like("%model_comparison_metric%"),
+        )
         .order_by(Forecast.created_at.desc())
         .all()
     )
@@ -48,31 +108,24 @@ def report_preview(
     forecast_data = []
 
     for forecast in forecasts:
-        try:
-            value = json.loads(forecast.forecast_values or "{}")
-        except Exception:
-            value = {}
-
-        forecast_data.append(
-            {
-                "product": value.get("product", "N/A"),
-                "predicted_sales": value.get("predicted_sales", 0),
-                "model": forecast.model_name,
-                "dataset_id": forecast.dataset_id,
-                "created_at": forecast.created_at,
-            }
-        )
+        forecast_data.extend(extract_forecast_items(forecast))
 
     total_sales = sum(
         float(item["predicted_sales"] or 0)
         for item in forecast_data
     )
 
+    unique_products = {
+        item["product"]
+        for item in forecast_data
+        if item["product"] != "N/A"
+    }
+
     return {
         "user_name": current_user.name,
         "total_sales": round(total_sales, 2),
-        "total_products": len(forecast_data),
-        "forecast_count": len(forecast_data),
+        "total_products": len(unique_products),
+        "forecast_count": len(forecasts),
         "forecast_data": forecast_data,
     }
 
@@ -84,7 +137,10 @@ def download_forecast_excel(
 ):
     forecasts = (
         db.query(Forecast)
-        .filter(Forecast.user_id == current_user.id)
+        .filter(
+            Forecast.user_id == current_user.id,
+            ~Forecast.forecast_values.like("%model_comparison_metric%"),
+        )
         .order_by(Forecast.created_at.desc())
         .all()
     )
@@ -98,6 +154,7 @@ def download_forecast_excel(
     )
 
     db.add(notification)
+
     send_email_notification(
         to_email=current_user.email,
         subject="Forecast Excel Report Ready",
@@ -139,7 +196,10 @@ def download_dashboard_pdf(
 ):
     forecasts = (
         db.query(Forecast)
-        .filter(Forecast.user_id == current_user.id)
+        .filter(
+            Forecast.user_id == current_user.id,
+            ~Forecast.forecast_values.like("%model_comparison_metric%"),
+        )
         .order_by(Forecast.created_at.desc())
         .all()
     )
@@ -153,13 +213,14 @@ def download_dashboard_pdf(
     )
 
     db.add(notification)
+
     send_email_notification(
-    to_email=current_user.email,
-    subject="Dashboard PDF Report Ready",
-    message=(
-        f"Hello {current_user.name},\n\n"
-        f"Your dashboard PDF report has been generated successfully.\n\n"
-        f"You can download it from the Reports section."
+        to_email=current_user.email,
+        subject="Dashboard PDF Report Ready",
+        message=(
+            f"Hello {current_user.name},\n\n"
+            f"Your dashboard PDF report has been generated successfully.\n\n"
+            f"You can download it from the Reports section."
         ),
     )
 
@@ -242,13 +303,14 @@ def download_analytics_summary_excel(
     )
 
     db.add(notification)
+
     send_email_notification(
-    to_email=current_user.email,
-    subject="Analytics Summary Report Ready",
-    message=(
-        f"Hello {current_user.name},\n\n"
-        f"Your analytics summary Excel report has been generated successfully.\n\n"
-        f"You can download it from the Reports section."
+        to_email=current_user.email,
+        subject="Analytics Summary Report Ready",
+        message=(
+            f"Hello {current_user.name},\n\n"
+            f"Your analytics summary Excel report has been generated successfully.\n\n"
+            f"You can download it from the Reports section."
         ),
     )
 
@@ -324,13 +386,14 @@ def download_forecast_comparison_excel(
     )
 
     db.add(notification)
+
     send_email_notification(
-    to_email=current_user.email,
-    subject="Forecast Comparison Report Ready",
-    message=(
-        f"Hello {current_user.name},\n\n"
-        f"Your forecast comparison Excel report has been generated successfully.\n\n"
-        f"You can download it from the Reports section."
+        to_email=current_user.email,
+        subject="Forecast Comparison Report Ready",
+        message=(
+            f"Hello {current_user.name},\n\n"
+            f"Your forecast comparison Excel report has been generated successfully.\n\n"
+            f"You can download it from the Reports section."
         ),
     )
 
@@ -356,6 +419,8 @@ def download_forecast_comparison_excel(
             )
         },
     )
+
+
 @router.get("/dashboard/summary/excel")
 def download_dashboard_summary_excel(
     db: Session = Depends(get_db),
@@ -363,7 +428,10 @@ def download_dashboard_summary_excel(
 ):
     forecasts = (
         db.query(Forecast)
-        .filter(Forecast.user_id == current_user.id)
+        .filter(
+            Forecast.user_id == current_user.id,
+            ~Forecast.forecast_values.like("%model_comparison_metric%"),
+        )
         .order_by(Forecast.id.desc())
         .all()
     )
@@ -379,13 +447,10 @@ def download_dashboard_summary_excel(
     models = {}
 
     for forecast in forecasts:
-        try:
-            values = json.loads(forecast.forecast_values or "{}")
-        except Exception:
-            values = {}
+        items = extract_forecast_items(forecast)
 
-        predicted_sales = float(values.get("predicted_sales", 0) or 0)
-        total_sales += predicted_sales
+        for item in items:
+            total_sales += float(item["predicted_sales"] or 0)
 
         models[forecast.model_name] = models.get(forecast.model_name, 0) + 1
 

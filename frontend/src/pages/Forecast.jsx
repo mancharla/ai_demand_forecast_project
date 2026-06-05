@@ -61,9 +61,9 @@ function Forecast() {
 
       const response = await API.get("/datasets/my-datasets");
 
-      setDatasets(response.data);
+      setDatasets(response.data || []);
 
-      if (response.data.length > 0) {
+      if (response.data?.length > 0) {
         setDatasetId(response.data[0].id);
       }
     } catch (error) {
@@ -77,7 +77,7 @@ function Forecast() {
   const fetchHistory = async () => {
     try {
       const response = await API.get("/forecast/history/my-history");
-      setHistory(response.data);
+      setHistory(response.data || []);
     } catch (error) {
       console.log(error.response);
     }
@@ -86,7 +86,7 @@ function Forecast() {
   const fetchMetrics = async () => {
     try {
       const response = await API.get("/forecast/metrics/my-metrics");
-      setMetrics(response.data);
+      setMetrics(response.data || []);
     } catch (error) {
       console.log(error.response);
     }
@@ -105,35 +105,46 @@ function Forecast() {
         `/forecast/${datasetId}?days=${forecastDays}&model_type=${modelType}`
       );
 
-      const productForecasts =
-        response.data.product_forecasts.map((item) => ({
+      const productForecasts = (response.data.product_forecasts || []).map(
+        (item) => ({
           product: item.product,
           sales: item.predicted_sales,
-          model_used: item.model_used,
-          mae: item.accuracy?.mae,
-          rmse: item.accuracy?.rmse,
-          mape: item.accuracy?.mape,
-        }));
+          model_used: item.model_used || response.data.model_used,
+        })
+      );
 
       const cityWiseSales = Object.entries(
-        response.data.city_wise_sales
+        response.data.city_wise_sales || {}
       ).map(([city, sales]) => ({
         city,
         sales,
       }));
 
       const monthlyData = Object.entries(
-        response.data.monthly_sales
+        response.data.monthly_sales || {}
       ).map(([month, sales]) => ({
         month,
         sales,
       }));
 
+      const inventoryData = (response.data.inventory_recommendations || []).map(
+        (item) => {
+          const matchedProduct = productForecasts.find(
+            (forecast) => forecast.product === item.product
+          );
+
+          return {
+            ...item,
+            predicted_sales: matchedProduct?.sales || 0,
+          };
+        }
+      );
+
       setForecastData(productForecasts);
       setCitySales(cityWiseSales);
       setMonthlySales(monthlyData);
-      setInventory(response.data.inventory_recommendations);
-      setTopProduct(response.data.top_demand_product);
+      setInventory(inventoryData);
+      setTopProduct(response.data.top_demand_product || "N/A");
       setModelComparison(response.data.model_comparison || []);
 
       setSelectedProduct("All");
@@ -144,33 +155,22 @@ function Forecast() {
     } catch (error) {
       console.log(error.response);
 
-      alert(
-        error.response?.data?.detail ||
-          "Forecast generation failed"
-      );
+      alert(error.response?.data?.detail || "Forecast generation failed");
     } finally {
       setLoadingForecast(false);
     }
   };
 
   const filteredForecastData = useMemo(() => {
-    if (selectedProduct === "All") {
-      return forecastData;
-    }
+    if (selectedProduct === "All") return forecastData;
 
-    return forecastData.filter(
-      (item) => item.product === selectedProduct
-    );
+    return forecastData.filter((item) => item.product === selectedProduct);
   }, [forecastData, selectedProduct]);
 
   const filteredCitySales = useMemo(() => {
-    if (selectedRegion === "All") {
-      return citySales;
-    }
+    if (selectedRegion === "All") return citySales;
 
-    return citySales.filter(
-      (item) => item.city === selectedRegion
-    );
+    return citySales.filter((item) => item.city === selectedRegion);
   }, [citySales, selectedRegion]);
 
   const totalPredictedSales = forecastData.reduce(
@@ -185,25 +185,22 @@ function Forecast() {
 
   const highestPredictedSales =
     forecastData.length > 0
-      ? Math.max(...forecastData.map((item) => item.sales))
+      ? Math.max(...forecastData.map((item) => Number(item.sales || 0)))
       : 0;
 
-  const averageRMSE =
-    forecastData.length > 0
-      ? (
-          forecastData.reduce(
-            (sum, item) => sum + Number(item.rmse || 0),
-            0
-          ) / forecastData.length
-        ).toFixed(2)
-      : 0;
+  const bestModel =
+    modelComparison.length > 0
+      ? modelComparison.reduce((best, current) =>
+          Number(best.mape || 999999) < Number(current.mape || 999999)
+            ? best
+            : current
+        )
+      : null;
 
   const StatCard = ({ title, value, color }) => (
     <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition-all duration-300">
       <p className="text-gray-500">{title}</p>
-      <h2 className={`text-3xl font-bold mt-2 ${color}`}>
-        {value}
-      </h2>
+      <h2 className={`text-3xl font-bold mt-2 ${color}`}>{value}</h2>
     </div>
   );
 
@@ -216,8 +213,8 @@ function Forecast() {
           </h1>
 
           <p className="text-gray-500 mb-6">
-            Select dataset, forecast duration, and ML model to compare
-            predictions with accuracy metrics.
+            Select dataset, forecast duration, and ML model to generate demand
+            predictions.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -232,7 +229,10 @@ function Forecast() {
               ) : (
                 datasets.map((dataset) => (
                   <option key={dataset.id} value={dataset.id}>
-                    #{dataset.id} - {dataset.file_name}
+                    #{dataset.id} -{" "}
+                    {dataset.file_name ||
+                      dataset.original_filename ||
+                      dataset.filename}
                   </option>
                 ))
               )}
@@ -256,6 +256,7 @@ function Forecast() {
               <option value="best">Best Model</option>
               <option value="linear_regression">Linear Regression</option>
               <option value="random_forest">Random Forest</option>
+              <option value="xgboost">XGBoost</option>
             </select>
 
             <select
@@ -296,9 +297,7 @@ function Forecast() {
                 : "bg-gradient-to-r from-blue-600 to-indigo-700 hover:scale-105 hover:shadow-2xl"
             }`}
           >
-            {loadingForecast
-              ? "Generating Forecast..."
-              : "Generate Forecast"}
+            {loadingForecast ? "Generating Forecast..." : "Generate Forecast"}
           </button>
         </div>
 
@@ -307,9 +306,45 @@ function Forecast() {
             <h2 className="text-2xl font-bold mb-2">
               No Forecast Generated Yet
             </h2>
-            <p>
-              Select a dataset and model, then click Generate Forecast.
-            </p>
+            <p>Select a dataset and model, then click Generate Forecast.</p>
+          </div>
+        )}
+
+        {forecastData.length > 0 && (
+          <div className="bg-white rounded-3xl shadow-xl p-8">
+            <h2 className="text-2xl font-bold mb-6">Forecast Summary</h2>
+
+            <div className="grid md:grid-cols-4 gap-6">
+              <div className="bg-blue-50 p-5 rounded-2xl">
+                <p className="text-gray-500">Top Product</p>
+                <h3 className="text-2xl font-bold text-blue-600">
+                  {topProduct}
+                </h3>
+              </div>
+
+              <div className="bg-green-50 p-5 rounded-2xl">
+                <p className="text-gray-500">Best Model</p>
+                <h3 className="text-2xl font-bold text-green-600">
+                  {bestModel?.model_name || forecastData[0]?.model_used || "N/A"}
+                </h3>
+              </div>
+
+              <div className="bg-purple-50 p-5 rounded-2xl">
+                <p className="text-gray-500">Accuracy</p>
+                <h3 className="text-2xl font-bold text-purple-600">
+                  {bestModel?.accuracy
+                    ? `${Number(bestModel.accuracy).toFixed(2)}%`
+                    : "N/A"}
+                </h3>
+              </div>
+
+              <div className="bg-orange-50 p-5 rounded-2xl">
+                <p className="text-gray-500">Forecast Days</p>
+                <h3 className="text-2xl font-bold text-orange-600">
+                  {forecastDays}
+                </h3>
+              </div>
+            </div>
           </div>
         )}
 
@@ -329,19 +364,23 @@ function Forecast() {
 
             <StatCard
               title="Average Prediction"
-              value={`₹ ${averagePredictedSales}`}
+              value={`₹ ${Number(averagePredictedSales).toLocaleString(
+                "en-IN"
+              )}`}
               color="text-purple-600"
             />
 
             <StatCard
               title="Highest Prediction"
-              value={`₹ ${highestPredictedSales}`}
+              value={`₹ ${Number(highestPredictedSales).toLocaleString(
+                "en-IN"
+              )}`}
               color="text-red-600"
             />
 
             <StatCard
-              title="Average RMSE"
-              value={averageRMSE}
+              title="Total Predicted Sales"
+              value={`₹ ${Number(totalPredictedSales).toLocaleString("en-IN")}`}
               color="text-orange-600"
             />
           </div>
@@ -350,9 +389,7 @@ function Forecast() {
         {forecastData.length > 0 && (
           <div className="bg-white rounded-3xl shadow-xl p-8">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">
-                Product-wise Forecast
-              </h2>
+              <h2 className="text-2xl font-bold">Product-wise Forecast</h2>
 
               <span className="bg-blue-100 text-blue-700 px-4 py-2 rounded-full text-sm font-semibold">
                 {forecastDays} Days | {modelType}
@@ -392,10 +429,7 @@ function Forecast() {
                   label
                 >
                   {filteredCitySales.map((entry, index) => (
-                    <Cell
-                      key={index}
-                      fill={COLORS[index % COLORS.length]}
-                    />
+                    <Cell key={index} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
 
@@ -408,9 +442,7 @@ function Forecast() {
 
         {monthlySales.length > 0 && (
           <div className="bg-white rounded-3xl shadow-xl p-8">
-            <h2 className="text-2xl font-bold mb-6">
-              Monthly Sales Trend
-            </h2>
+            <h2 className="text-2xl font-bold mb-6">Monthly Sales Trend</h2>
 
             <ResponsiveContainer width="100%" height={400}>
               <LineChart data={monthlySales}>
@@ -433,29 +465,27 @@ function Forecast() {
 
         {forecastData.length > 0 && (
           <div className="bg-white rounded-3xl shadow-xl p-8 overflow-x-auto">
-            <h2 className="text-2xl font-bold mb-6">
-              Product Accuracy Metrics
-            </h2>
+            <h2 className="text-2xl font-bold mb-6">Forecasted Products</h2>
 
             <table className="w-full border">
               <thead>
                 <tr className="bg-gray-100">
                   <th className="p-3 text-left">Product</th>
+                  <th className="p-3 text-left">Predicted Sales</th>
                   <th className="p-3 text-left">Model Used</th>
-                  <th className="p-3 text-left">MAE</th>
-                  <th className="p-3 text-left">RMSE</th>
-                  <th className="p-3 text-left">MAPE (%)</th>
                 </tr>
               </thead>
 
               <tbody>
-                {forecastData.map((item, index) => (
-                  <tr key={index} className="border-t hover:bg-gray-50">
+                {forecastData.map((item) => (
+                  <tr key={item.product} className="border-t hover:bg-gray-50">
                     <td className="p-3">{item.product}</td>
+
+                    <td className="p-3">
+                      ₹ {Number(item.sales || 0).toLocaleString("en-IN")}
+                    </td>
+
                     <td className="p-3">{item.model_used}</td>
-                    <td className="p-3">{item.mae}</td>
-                    <td className="p-3">{item.rmse}</td>
-                    <td className="p-3">{item.mape}</td>
                   </tr>
                 ))}
               </tbody>
@@ -465,29 +495,35 @@ function Forecast() {
 
         {modelComparison.length > 0 && (
           <div className="bg-white rounded-3xl shadow-xl p-8 overflow-x-auto">
-            <h2 className="text-2xl font-bold mb-6">
-              Model Comparison
-            </h2>
+            <h2 className="text-2xl font-bold mb-6">Model Comparison</h2>
 
             <table className="w-full border">
               <thead>
                 <tr className="bg-gray-100">
-                  <th className="p-3 text-left">Product</th>
                   <th className="p-3 text-left">Model</th>
                   <th className="p-3 text-left">MAE</th>
                   <th className="p-3 text-left">RMSE</th>
                   <th className="p-3 text-left">MAPE (%)</th>
+                  <th className="p-3 text-left">Accuracy (%)</th>
                 </tr>
               </thead>
 
               <tbody>
                 {modelComparison.map((item, index) => (
                   <tr key={index} className="border-t hover:bg-gray-50">
-                    <td className="p-3">{item.product}</td>
-                    <td className="p-3">{item.model_name}</td>
-                    <td className="p-3">{item.mae}</td>
-                    <td className="p-3">{item.rmse}</td>
-                    <td className="p-3">{item.mape}</td>
+                    <td className="p-3">{item.model_name || item.model}</td>
+                    <td className="p-3">
+                      {Number(item.mae || 0).toFixed(2)}
+                    </td>
+                    <td className="p-3">
+                      {Number(item.rmse || 0).toFixed(2)}
+                    </td>
+                    <td className="p-3">
+                      {Number(item.mape || 0).toFixed(2)}
+                    </td>
+                    <td className="p-3">
+                      {Number(item.accuracy || 0).toFixed(2)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -505,18 +541,21 @@ function Forecast() {
               <thead>
                 <tr className="bg-gray-100">
                   <th className="p-4 text-left">Product</th>
+                  <th className="p-4 text-left">Predicted Sales</th>
                   <th className="p-4 text-left">Recommendation</th>
                 </tr>
               </thead>
 
               <tbody>
                 {inventory.map((item, index) => (
-                  <tr
-                    key={index}
-                    className="border-t hover:bg-gray-50"
-                  >
-                    <td className="p-4 font-medium">
-                      {item.product}
+                  <tr key={index} className="border-t hover:bg-gray-50">
+                    <td className="p-4 font-medium">{item.product}</td>
+
+                    <td className="p-4">
+                      ₹{" "}
+                      {Number(item.predicted_sales || 0).toLocaleString(
+                        "en-IN"
+                      )}
                     </td>
 
                     <td className="p-4">
@@ -541,9 +580,7 @@ function Forecast() {
 
         <div className="grid lg:grid-cols-2 gap-8">
           <div className="bg-white rounded-3xl shadow-xl p-8 overflow-x-auto">
-            <h2 className="text-2xl font-bold mb-6">
-              Forecast History
-            </h2>
+            <h2 className="text-2xl font-bold mb-6">Forecast History</h2>
 
             {history.length === 0 ? (
               <p className="text-gray-500">No history available.</p>
@@ -566,7 +603,11 @@ function Forecast() {
                       <td className="p-3">{item.model_name}</td>
                       <td className="p-3">{item.forecast_days}</td>
                       <td className="p-3">{item.top_demand_product}</td>
-                      <td className="p-3 text-sm">{item.created_at}</td>
+                      <td className="p-3 text-sm">
+                        {item.created_at
+                          ? new Date(item.created_at).toLocaleString()
+                          : "N/A"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -590,6 +631,7 @@ function Forecast() {
                     <th className="p-3 text-left">MAE</th>
                     <th className="p-3 text-left">RMSE</th>
                     <th className="p-3 text-left">MAPE</th>
+                    <th className="p-3 text-left">Accuracy</th>
                   </tr>
                 </thead>
 
@@ -598,9 +640,18 @@ function Forecast() {
                     <tr key={item.id} className="border-t hover:bg-gray-50">
                       <td className="p-3">{item.dataset_id}</td>
                       <td className="p-3">{item.model_name}</td>
-                      <td className="p-3">{item.mae}</td>
-                      <td className="p-3">{item.rmse}</td>
-                      <td className="p-3">{item.mape}</td>
+                      <td className="p-3">
+                        {Number(item.mae || 0).toFixed(2)}
+                      </td>
+                      <td className="p-3">
+                        {Number(item.rmse || 0).toFixed(2)}
+                      </td>
+                      <td className="p-3">
+                        {Number(item.mape || 0).toFixed(2)}
+                      </td>
+                      <td className="p-3">
+                        {Number(item.accuracy || 0).toFixed(2)}%
+                      </td>
                     </tr>
                   ))}
                 </tbody>

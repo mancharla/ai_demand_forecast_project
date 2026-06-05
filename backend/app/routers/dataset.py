@@ -1,6 +1,7 @@
 import os
 import uuid
 import pandas as pd
+from typing import Optional
 
 from fastapi import (
     APIRouter,
@@ -13,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Dataset, Notification
+from app.models_extended import ForecastProject, ProjectDataset, ProjectMember
 from app.utils.dependencies import get_current_user
 from app.services.activity_logger import log_activity
 from app.services.cache import clear_cache
@@ -29,6 +31,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @router.post("/upload")
 async def upload_dataset(
     file: UploadFile = File(...),
+    project_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -114,6 +117,36 @@ async def upload_dataset(
 
         db.add(dataset)
         db.flush()
+
+        if project_id is not None:
+            project = db.query(ForecastProject).filter(ForecastProject.id == project_id).first()
+            if not project:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Project not found",
+                )
+
+            member = db.query(ProjectMember).filter(
+                ProjectMember.project_id == project_id,
+                ProjectMember.user_id == current_user.id,
+            ).first()
+
+            if (
+                current_user.id != project.owner_id
+                and member is None
+                and not project.is_public
+            ):
+                raise HTTPException(
+                    status_code=403,
+                    detail="You do not have permission to attach datasets to this project",
+                )
+
+            project_dataset = ProjectDataset(
+                project_id=project_id,
+                dataset_id=dataset.id,
+            )
+            db.add(project_dataset)
+            project.total_datasets = (project.total_datasets or 0) + 1
 
         notification = Notification(
             user_id=current_user.id,

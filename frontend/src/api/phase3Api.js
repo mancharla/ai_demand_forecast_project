@@ -111,6 +111,26 @@ export const getForecastMetrics = () => {
   return API.get("/forecast/metrics/my-metrics");
 };
 
+export const getExecutiveOverview = (projectId) => {
+  return API.get(`/executive-dashboard/${projectId}`);
+};
+
+export const getExecutiveRevenueForecast = (projectId) => {
+  return API.get(`/executive-dashboard/${projectId}/revenue-forecast`);
+};
+
+export const getExecutiveProfitAnalysis = (projectId) => {
+  return API.get(`/executive-dashboard/${projectId}/profit-analysis`);
+};
+
+export const getExecutiveCostAnalysis = (projectId) => {
+  return API.get(`/executive-dashboard/${projectId}/cost-analysis`);
+};
+
+export const getExecutiveKpiSummary = (projectId) => {
+  return API.get(`/executive-dashboard/${projectId}/kpi-summary`);
+};
+
 /* =========================
    NOTIFICATION APIs
 ========================= */
@@ -126,6 +146,7 @@ export const markNotificationRead = (id) => {
 export const markAllNotificationsRead = () => {
   return API.put("/notifications/mark-all/read");
 };
+
 export const getRegionDrilldown = (datasetId, region) => {
   return API.get(`/drilldown/region/${datasetId}/${region}`);
 };

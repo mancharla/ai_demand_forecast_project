@@ -45,19 +45,21 @@ function Navbar() {
   };
 
   const markAllAsRead = async () => {
-    try {
-      await API.put("/notifications/mark-all/read");
+  try {
+    await API.put("/notifications/mark-all-read");
 
-      setNotifications((prev) =>
-        prev.map((item) => ({
-          ...item,
-          is_read: true,
-        }))
-      );
-    } catch (error) {
-      console.log(error.response);
-    }
-  };
+    setNotifications((prev) =>
+      prev.map((item) => ({
+        ...item,
+        is_read: true,
+      }))
+    );
+
+    setShowNotifications(false);
+  } catch (error) {
+    console.log(error.response);
+  }
+};
 
   const logout = () => {
     localStorage.clear();
@@ -72,7 +74,9 @@ function Navbar() {
     { name: "Dashboard", path: "/dashboard", icon: "📊" },
     { name: "Upload", path: "/upload", icon: "📁" },
     { name: "Forecast", path: "/forecast", icon: "📈" },
+    { name: "Executive Dashboard", path: "/executive-dashboard", icon: "🏢" },
     { name: "Reports", path: "/reports", icon: "📄" },
+    { name: "Workspaces", path: "/projects", icon: "🗂️" },
     { name: "AI Recommendations", path: "/ai-recommendations", icon: "🤖" },
   ];
 
