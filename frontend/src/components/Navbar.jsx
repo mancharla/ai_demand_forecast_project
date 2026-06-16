@@ -2,20 +2,21 @@ import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import API from "../api/axios";
 import { useTheme } from "../context/ThemeContext";
+
 function Navbar() {
   const location = useLocation();
   const { darkMode, toggleTheme } = useTheme();
-  // Theme toggling removed — keep layout static
+
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const userName = user.name || "User";
- const isAdmin =
-  user?.role === "super_admin" ||
-  user?.role === "admin";
+
+  const isAdmin =
+    user?.role === "super_admin" ||
+    user?.role === "admin";
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
-  
 
   useEffect(() => {
     fetchNotifications();
@@ -24,9 +25,9 @@ function Navbar() {
   const fetchNotifications = async () => {
     try {
       const response = await API.get("/notifications");
-      setNotifications(response.data);
+      setNotifications(response.data || []);
     } catch (error) {
-      console.log(error.response);
+      console.log(error.response || error);
     }
   };
 
@@ -40,51 +41,91 @@ function Navbar() {
         )
       );
     } catch (error) {
-      console.log(error.response);
+      console.log(error.response || error);
     }
   };
 
   const markAllAsRead = async () => {
-  try {
-    await API.put("/notifications/mark-all-read");
+    try {
+      await API.put("/notifications/mark-all-read");
 
-    setNotifications((prev) =>
-      prev.map((item) => ({
-        ...item,
-        is_read: true,
-      }))
-    );
+      setNotifications((prev) =>
+        prev.map((item) => ({
+          ...item,
+          is_read: true,
+        }))
+      );
 
-    setShowNotifications(false);
-  } catch (error) {
-    console.log(error.response);
-  }
-};
+      setShowNotifications(false);
+    } catch (error) {
+      console.log(error.response || error);
+    }
+  };
 
   const logout = () => {
     localStorage.clear();
     window.location.href = "/";
   };
 
-  const unreadCount = notifications.filter(
-    (item) => !item.is_read
-  ).length;
+  const unreadCount = notifications.filter((item) => !item.is_read).length;
 
-  const navLinks = [
-    { name: "Dashboard", path: "/dashboard", icon: "📊" },
-    { name: "Upload", path: "/upload", icon: "📁" },
-    { name: "Forecast", path: "/forecast", icon: "📈" },
-    { name: "Executive Dashboard", path: "/executive-dashboard", icon: "🏢" },
-    { name: "Reports", path: "/reports", icon: "📄" },
-    { name: "Workspaces", path: "/projects", icon: "🗂️" },
-    { name: "AI Recommendations", path: "/ai-recommendations", icon: "🤖" },
+  const navGroups = [
+    {
+      title: "Enterprise",
+      links: [
+        { name: "Enterprise Dashboard", path: "/enterprise-dashboard", icon: "🏛️" },
+        { name: "Organizations", path: "/organizations", icon: "🏢" },
+        { name: "Executive Command Center", path: "/executive-command-center", icon: "👔" },
+        { name: "Project Overview", path: "/project-overview", icon: "📁" },
+      ],
+    },
+    {
+      title: "Core",
+      links: [
+        { name: "Dashboard", path: "/dashboard", icon: "📊" },
+        { name: "Upload", path: "/upload", icon: "📁" },
+        { name: "Forecast", path: "/forecast", icon: "📈" },
+        { name: "Reports", path: "/reports", icon: "📄" },
+        { name: "Workspaces", path: "/projects", icon: "🗂️" },
+      ],
+    },
+    {
+      title: "Governance",
+      links: [
+        { name: "Forecast Approvals", path: "/forecast-approvals", icon: "✅" },
+        { name: "Forecast Governance", path: "/forecast-governance", icon: "🛡️" },
+        { name: "Workflow Automation", path: "/workflow-automation", icon: "⚙️" },
+        { name: "Audit Logs", path: "/audit-logs", icon: "📜" },
+      ],
+    },
+    {
+      title: "Planning & Intelligence",
+      links: [
+        { name: "Strategic Planning", path: "/strategic-planning", icon: "🎯" },
+        { name: "KPI Management", path: "/kpi-management", icon: "📌" },
+        { name: "Data Quality", path: "/data-quality", icon: "🧹" },
+        { name: "Executive Dashboard", path: "/executive-dashboard", icon: "📋" },
+        { name: "AI Recommendations", path: "/ai-recommendations", icon: "🤖" },
+        { name: "KPI Trends", path: "/kpi-trends", icon: "📈" },
+        { name: "KPI Reports", path: "/kpi-reports", icon: "📊" },
+      ],
+    },
+    {
+      title: "Communication",
+      links: [
+        { name: "Notification Center", path: "/notification-center", icon: "🔔" },
+        { name: "Report Sharing", path: "/report-sharing", icon: "📤" },
+        { name: "Data Quality Reports", path: "/data-quality-reports", icon: "📑" },
+      ],
+    },
   ];
 
   if (isAdmin) {
-    navLinks.push({
-      name: "Admin Panel",
-      path: "/admin",
-      icon: "🛡️",
+    navGroups.push({
+      title: "Admin",
+      links: [
+        { name: "Admin Panel", path: "/admin", icon: "🛡️" },
+      ],
     });
   }
 
@@ -94,16 +135,33 @@ function Navbar() {
     <Link
       to={link.path}
       onClick={() => setSidebarOpen(false)}
-      className={`flex items-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all ${
+      className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
         isActive(link.path)
-
-        ? "bg-white text-blue-700 shadow-lg dark:bg-white/10 dark:text-blue-100"
+          ? "bg-white text-blue-700 shadow-lg dark:bg-white/10 dark:text-blue-100"
           : "text-blue-100 dark:text-blue-200 hover:bg-white/15 hover:text-white"
       }`}
     >
       <span className="text-lg">{link.icon}</span>
       <span>{link.name}</span>
     </Link>
+  );
+
+  const SidebarContent = () => (
+    <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
+      {navGroups.map((group) => (
+        <div key={group.title}>
+          <p className="mb-2 px-3 text-xs font-bold uppercase tracking-wider text-blue-200/80">
+            {group.title}
+          </p>
+
+          <div className="space-y-1">
+            {group.links.map((link) => (
+              <SidebarLink key={link.path} link={link} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 
   return (
@@ -133,7 +191,7 @@ function Navbar() {
         </button>
       </div>
 
-      <aside className="hidden lg:flex fixed top-0 left-0 h-screen w-64 bg-gradient-to-b from-blue-600 to-indigo-700 dark:from-slate-900 dark:to-slate-950 text-white z-50 shadow-2xl flex-col transition-colors duration-300">
+      <aside className="hidden lg:flex fixed top-0 left-0 h-screen w-72 bg-gradient-to-b from-blue-600 to-indigo-700 dark:from-slate-900 dark:to-slate-950 text-white z-50 shadow-2xl flex-col transition-colors duration-300">
         <div className="p-6 border-b border-white/20">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-white text-blue-700 rounded-2xl flex items-center justify-center text-2xl shadow dark:bg-slate-800 dark:text-blue-300">
@@ -141,21 +199,13 @@ function Navbar() {
             </div>
 
             <div>
-              <h1 className="text-xl font-extrabold">
-                AI Forecast
-              </h1>
-              <p className="text-xs text-blue-100">
-                Demand Platform
-              </p>
+              <h1 className="text-xl font-extrabold">AI Forecast</h1>
+              <p className="text-xs text-blue-100">Enterprise Platform</p>
             </div>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-6 space-y-3">
-          {navLinks.map((link) => (
-            <SidebarLink key={link.path} link={link} />
-          ))}
-        </div>
+        <SidebarContent />
 
         <div className="p-4 border-t border-white/20 space-y-3">
           <button
@@ -165,6 +215,7 @@ function Navbar() {
             <span>{darkMode ? "☀️" : "🌙"}</span>
             <span>{darkMode ? "Switch to Light" : "Switch to Dark"}</span>
           </button>
+
           <button
             onClick={logout}
             className="w-full bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 py-3 rounded-xl font-bold transition-colors duration-300"
@@ -174,14 +225,12 @@ function Navbar() {
         </div>
       </aside>
 
-      <header className="hidden lg:flex fixed top-0 left-64 right-0 h-14 bg-white dark:bg-slate-900 shadow-sm z-40 items-center justify-between px-6 transition-colors duration-300">
+      <header className="hidden lg:flex fixed top-0 left-72 right-0 h-14 bg-white dark:bg-slate-900 shadow-sm z-40 items-center justify-between px-6 transition-colors duration-300">
         <div>
           <h2 className="text-lg font-bold text-gray-800 dark:text-white">
             AI Demand Forecasting
-            </h2>
-            <p className="text-xs text-gray-500">
-              Welcome back, {userName}
-              </p>
+          </h2>
+          <p className="text-xs text-gray-500">Welcome back, {userName}</p>
         </div>
 
         <div className="flex items-center gap-5 relative">
@@ -189,7 +238,6 @@ function Navbar() {
             onClick={() => setShowNotifications(!showNotifications)}
             className="relative w-9 h-9 bg-gray-100 dark:bg-slate-800 rounded-lg text-lg hover:bg-blue-50 dark:hover:bg-blue-900 transition-colors duration-300"
           >
-
             🔔
 
             {unreadCount > 0 && (
@@ -203,10 +251,12 @@ function Navbar() {
             <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-indigo-700 text-white flex items-center justify-center font-bold shadow">
               {userName.charAt(0).toUpperCase()}
             </div>
+
             <div className="leading-tight">
               <p className="text-sm font-semibold text-gray-800 dark:text-white">
                 {userName}
               </p>
+
               <span
                 className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
                   user.role === "admin"
@@ -247,19 +297,19 @@ function Navbar() {
               notifications.map((item) => (
                 <div
                   key={item.id}
-                  onClick={() =>
-                    !item.is_read && markAsRead(item.id)
-                  }
+                  onClick={() => !item.is_read && markAsRead(item.id)}
                   className={`p-4 border-b border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-800 ${
                     !item.is_read ? "bg-blue-50 dark:bg-slate-800" : ""
                   }`}
                 >
                   <h3 className="font-bold text-gray-800 dark:text-white">
-                    {item.title}
+                    {item.title || "Notification"}
                   </h3>
+
                   <p className="text-sm text-gray-600 dark:text-gray-300">
                     {item.message}
                   </p>
+
                   <p className="text-xs text-gray-400 dark:text-gray-400 mt-1">
                     {item.created_at}
                   </p>
@@ -274,34 +324,25 @@ function Navbar() {
         <div
           onClick={() => setSidebarOpen(false)}
           className="fixed inset-0 bg-black/40 z-[60]"
-        ></div>
+        />
       )}
 
       <aside
-        className={`lg:hidden fixed top-0 left-0 h-screen w-72 bg-gradient-to-b from-blue-600 to-indigo-700 dark:from-slate-900 dark:to-slate-950 z-[70] text-white shadow-2xl transform transition-transform ${
+        className={`lg:hidden fixed top-0 left-0 h-screen w-72 bg-gradient-to-b from-blue-600 to-indigo-700 dark:from-slate-900 dark:to-slate-950 z-[70] text-white shadow-2xl transform transition-transform flex flex-col ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <div className="p-6 border-b border-white/20 flex justify-between items-center">
-          <h1 className="text-xl font-extrabold">
-            AI Forecast
-          </h1>
+          <h1 className="text-xl font-extrabold">AI Forecast</h1>
 
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="text-2xl"
-          >
+          <button onClick={() => setSidebarOpen(false)} className="text-2xl">
             ✕
           </button>
         </div>
 
-        <div className="p-4 space-y-3">
-          {navLinks.map((link) => (
-            <SidebarLink key={link.path} link={link} />
-          ))}
-        </div>
+        <SidebarContent />
 
-        <div className="absolute bottom-0 left-0 right-0 p-5 space-y-3">
+        <div className="p-5 border-t border-white/20 space-y-3">
           <button
             onClick={toggleTheme}
             className="w-full inline-flex items-center justify-center gap-3 bg-white text-slate-900 dark:bg-slate-800 dark:text-white border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 py-3 rounded-2xl font-semibold transition-colors duration-300"
@@ -309,6 +350,7 @@ function Navbar() {
             <span>{darkMode ? "☀️" : "🌙"}</span>
             <span>{darkMode ? "Switch to Light" : "Switch to Dark"}</span>
           </button>
+
           <button
             onClick={logout}
             className="w-full bg-red-500 py-3 rounded-xl font-bold hover:bg-red-600 transition-colors duration-300"

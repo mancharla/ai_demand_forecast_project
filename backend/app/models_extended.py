@@ -21,6 +21,7 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from datetime import datetime
 
 
+
 # =========================
 # WORKSPACE & PROJECT MODELS
 # =========================
@@ -437,3 +438,315 @@ class ReportShare(Base):
 
     is_active = Column(Integer, default=1)
     shared_at = Column(DateTime, default=datetime.utcnow)
+class Organization(Base):
+    __tablename__ = "organizations"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    name = Column(String(150), nullable=False)
+    description = Column(Text, nullable=True)
+    industry = Column(String(100), nullable=True)
+    country = Column(String(100), nullable=True)
+
+    owner_id = Column(Integer, ForeignKey("users.id"))
+
+    is_active = Column(Integer, default=1)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class OrganizationMember(Base):
+    __tablename__ = "organization_members"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    organization_id = Column(Integer, ForeignKey("organizations.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
+
+    role = Column(String(50), default="analyst")  
+    # owner / admin / manager / analyst / viewer
+
+    is_active = Column(Integer, default=1)
+
+    joined_at = Column(DateTime, default=datetime.utcnow)
+
+
+class OrganizationSetting(Base):
+    __tablename__ = "organization_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    organization_id = Column(Integer, ForeignKey("organizations.id"))
+
+    setting_key = Column(String(150), nullable=False)
+    setting_value = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+class ForecastApproval(Base):
+    __tablename__ = "forecast_approvals"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    forecast_id = Column(Integer, ForeignKey("forecasts.id"))
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
+
+    submitted_by = Column(Integer, ForeignKey("users.id"))
+    reviewed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    status = Column(String(50), default="pending")
+    # pending / approved / rejected
+
+    comments = Column(Text, nullable=True)
+
+    submitted_at = Column(DateTime, default=datetime.utcnow)
+    reviewed_at = Column(DateTime, nullable=True)
+
+
+class ForecastApprovalHistory(Base):
+    __tablename__ = "forecast_approval_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    approval_id = Column(Integer, ForeignKey("forecast_approvals.id"))
+    action_by = Column(Integer, ForeignKey("users.id"))
+
+    action = Column(String(50))
+    # submitted / approved / rejected / resubmitted
+
+    remarks = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+class Workflow(Base):
+    __tablename__ = "workflows"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    organization_id = Column(Integer, nullable=True)
+
+    workflow_name = Column(String(150), nullable=False)
+
+    workflow_type = Column(String(100), nullable=False)
+    # forecast_generation
+    # report_generation
+    # notification
+    # custom
+
+    trigger_type = Column(String(100), default="manual")
+    # manual
+    # schedule
+    # event
+
+    configuration = Column(JSON, nullable=True)
+
+    is_active = Column(Integer, default=1)
+
+    created_by = Column(Integer, ForeignKey("users.id"))
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class WorkflowExecutionLog(Base):
+    __tablename__ = "workflow_execution_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    workflow_id = Column(Integer, ForeignKey("workflows.id"))
+
+    execution_status = Column(String(50))
+    # success
+    # failed
+
+    execution_message = Column(Text, nullable=True)
+
+    started_at = Column(DateTime, default=datetime.utcnow)
+
+    completed_at = Column(DateTime, nullable=True)
+
+class BusinessTarget(Base):
+    __tablename__ = "business_targets"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
+    project_id = Column(Integer, ForeignKey("forecast_projects.id"), nullable=True)
+
+    target_name = Column(String(150), nullable=False)
+    target_type = Column(String(100), nullable=False)
+    # revenue / profit / demand / cost
+
+    target_period = Column(String(50), nullable=False)
+    # annual / quarterly / monthly
+
+    target_value = Column(Float, default=0)
+
+    actual_value = Column(Float, default=0)
+    forecast_value = Column(Float, default=0)
+
+    status = Column(String(50), default="on_track")
+    # on_track / at_risk / missed / achieved
+
+    created_by = Column(Integer, ForeignKey("users.id"))
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class PlanningRecommendation(Base):
+    __tablename__ = "planning_recommendations"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
+    project_id = Column(Integer, ForeignKey("forecast_projects.id"), nullable=True)
+
+    recommendation_type = Column(String(100))
+    title = Column(String(200))
+    description = Column(Text)
+    priority = Column(String(50), default="medium")
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+class ForecastGovernanceRecord(Base):
+    __tablename__ = "forecast_governance_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    forecast_id = Column(Integer, ForeignKey("forecasts.id"))
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
+
+    lifecycle_stage = Column(String(100), default="draft")
+    # draft / submitted / approved / rejected / archived
+
+    version_number = Column(Integer, default=1)
+
+    change_type = Column(String(100), default="created")
+    # created / updated / submitted / approved / rejected / archived
+
+    change_summary = Column(Text, nullable=True)
+
+    changed_by = Column(Integer, ForeignKey("users.id"))
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ForecastLifecycleStatus(Base):
+    __tablename__ = "forecast_lifecycle_status"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    forecast_id = Column(Integer, ForeignKey("forecasts.id"))
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
+
+    current_stage = Column(String(100), default="draft")
+    # draft / submitted / approved / rejected / archived
+
+    current_version = Column(Integer, default=1)
+
+    last_action_by = Column(Integer, ForeignKey("users.id"))
+
+    updated_at = Column(DateTime, default=datetime.utcnow)
+class CustomKPI(Base):
+    __tablename__ = "custom_kpis"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
+    project_id = Column(Integer, ForeignKey("forecast_projects.id"), nullable=True)
+
+    kpi_name = Column(String(150), nullable=False)
+    kpi_type = Column(String(100), nullable=False)
+
+    target_value = Column(Float, default=0)
+    current_value = Column(Float, default=0)
+
+    alert_threshold = Column(Float, default=0)
+
+    created_by = Column(Integer, ForeignKey("users.id"))
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class KPIPerformanceHistory(Base):
+    __tablename__ = "kpi_performance_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    kpi_id = Column(Integer, ForeignKey("custom_kpis.id"))
+
+    metric_value = Column(Float, default=0)
+
+    notes = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+class DataQualityReport(Base):
+    __tablename__ = "data_quality_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    dataset_id = Column(Integer, ForeignKey("datasets.id"))
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
+    project_id = Column(Integer, ForeignKey("forecast_projects.id"), nullable=True)
+
+    quality_score = Column(Float, default=0)
+
+    total_rows = Column(Integer, default=0)
+    total_columns = Column(Integer, default=0)
+    missing_values = Column(Integer, default=0)
+    duplicate_rows = Column(Integer, default=0)
+
+    validation_summary = Column(Text, nullable=True)
+
+    created_by = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime, default=datetime.utcnow)
+class NotificationPreference(Base):
+    __tablename__ = "notification_preferences"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    user_id = Column(Integer, ForeignKey("users.id"))
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
+
+    email_enabled = Column(Integer, default=0)
+    in_app_enabled = Column(Integer, default=1)
+
+    forecast_alerts = Column(Integer, default=1)
+    approval_alerts = Column(Integer, default=1)
+    report_alerts = Column(Integer, default=1)
+    workflow_alerts = Column(Integer, default=1)
+
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class OrganizationAnnouncement(Base):
+    __tablename__ = "organization_announcements"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
+
+    title = Column(String(200), nullable=False)
+    message = Column(Text, nullable=False)
+
+    role_target = Column(String(50), default="all")
+    # all / admin / manager / analyst / viewer
+
+    created_by = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    is_active = Column(Integer, default=1)
+
+class OrganizationAuditLog(Base):
+    __tablename__ = "organization_audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    module_name = Column(String(150), nullable=False)
+    action = Column(String(150), nullable=False)
+
+    description = Column(Text, nullable=True)
+
+    ip_address = Column(String(100), nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)

@@ -33,6 +33,11 @@ class User(Base):
     forecasts = relationship("Forecast", back_populates="user")
     reports = relationship("Report", back_populates="user")
     notifications = relationship("Notification", back_populates="user")
+    organization_id = Column(
+    Integer,
+    ForeignKey("organizations.id"),
+    nullable=True
+)
 
 
 # =========================
@@ -54,6 +59,7 @@ class Dataset(Base):
 
     user = relationship("User", back_populates="datasets")
     forecasts = relationship("Forecast", back_populates="dataset")
+    
 
 
 # =========================

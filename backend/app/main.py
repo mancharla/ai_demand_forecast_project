@@ -16,7 +16,11 @@ from app.models_extended import (
     ForecastScenario, ForecastComment, ForecastRevision, DatasetVersion,
     BusinessKPI, AIInsight, ExecutiveReport, ModelPerformance, DashboardLayout
 )
-
+from app.routers.strategic_planning import router as strategic_planning_router
+from app.routers.kpi_management import (
+    router as kpi_management_router
+)
+from app.routers.forecast_governance import router as forecast_governance_router
 from app.routers.auth import router as auth_router
 from app.routers.dataset import router as dataset_router
 from app.routers.forecast import router as forecast_router
@@ -55,6 +59,14 @@ from app.routers.workspaces import router as workspaces_router
 from app.routers.scenarios import router as scenarios_router
 from app.routers.executive_dashboard import router as executive_dashboard_router
 from app.routers.executive_reports import router as executive_reports_router
+from app.routers.forecast_approvals import router as forecast_approvals_router
+from app.routers.data_quality import router as data_quality_router
+from app.routers.executive_command_center import (
+    router as executive_command_center_router,
+)
+from app.routers.workflows import (
+    router as workflows_router
+)
 from app.routers.model_performance import (
     router as model_performance_router
 )
@@ -66,6 +78,9 @@ from app.routers.forecast_schedules import router as forecast_schedules_router
 from app.services.scheduler_service import start_scheduler, stop_scheduler
 from app.routers.activity_timeline import router as activity_timeline_router
 from app.routers.business_health import router as business_health_router
+from app.routers.organizations import router as organizations_router
+from app.routers.audit_logs import router as audit_logs_router
+from app.routers.notification_center import router as notification_center_router
 import time
 from jose import jwt, JWTError
 from app.config import SECRET_KEY, ALGORITHM
@@ -160,6 +175,9 @@ async def api_activity_middleware(request, call_next):
     return response
 
 app.include_router(auth_router)
+app.include_router(notification_center_router)
+app.include_router(executive_command_center_router)
+app.include_router(forecast_governance_router)
 app.include_router(dataset_router)
 app.include_router(forecast_router)
 app.include_router(dashboard_router)
@@ -184,7 +202,14 @@ app.include_router(workspaces_router)
 app.include_router(scenarios_router)
 app.include_router(executive_dashboard_router)
 app.include_router(ai_insights_router)
+app.include_router(audit_logs_router)
 app.include_router(executive_reports_router)
+app.include_router(organizations_router)
+app.include_router(forecast_approvals_router)
+app.include_router(workflows_router)
+app.include_router(strategic_planning_router)
+app.include_router(kpi_management_router)
+app.include_router(data_quality_router)
 app.include_router(
     model_performance_router
 )
